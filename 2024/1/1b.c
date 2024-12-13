@@ -19,7 +19,7 @@ int main(int argc, char *argv[]){
 
 	list_t *list = NULL;
 
-	f = fopen("../1a/input", "r");
+	f = fopen("input", "r");
 	if(f == NULL)
 		goto cleanup;
 
