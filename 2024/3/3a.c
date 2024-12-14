@@ -57,8 +57,8 @@ void get_input(FILE *f){
 				get_number(f, &a) && fgetc(f) == ',' && 
 				get_number(f, &b) && fgetc(f) == ')'){
 					s += a*b;
-			}
-			fseek(f, pos, SEEK_SET);
+			}else
+				fseek(f, pos, SEEK_SET);
 		}
 	}
 	printf("%u\n", s);
