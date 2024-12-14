@@ -8,37 +8,43 @@ typedef struct page {
 
 typedef struct rule {
 	int p;
-	page_t *prev_l;
-	page_t **prev_a;
-	int nprev;
+	page_t *plist;
 	struct rule *next;
 } rule_t;
 
-void get_rules(FILE *f, rule_t **pp);
+void get_rules(FILE *f, rule_t **pp_prev, rule_t **pp_post);
 
 void rule_list_print(rule_t *p);
 void rule_list_free(rule_t *p);
 
 void page_list_print(page_t *p);
+void page_list_free(page_t *p);
 
 int main(int argc, char *argv[]){
 
 	FILE *f = NULL;
 
-	rule_t *rule_list = NULL;
+	rule_t *rule_list_prev = NULL;
+	rule_t *rule_list_post = NULL;
 
 	f = fopen("input", "r");
 	if(f == NULL)
 		goto cleanup;
 
-	get_rules(f, &rule_list);
-	if(rule_list == NULL)
+	get_rules(f, &rule_list_prev, &rule_list_post);
+	if(rule_list_prev == NULL || rule_list_post == NULL)
 		goto cleanup;
 
-	rule_list_print(rule_list);
+	/*
+	printf("prev:\n");
+	rule_list_print(rule_list_prev);
+	printf("post:\n");
+	rule_list_print(rule_list_post);
+	*/
 
 cleanup:
-	rule_list_free(rule_list);
+	rule_list_free(rule_list_prev);
+	rule_list_free(rule_list_post);
 	if(f != NULL)
 		fclose(f);
 	return 0;
@@ -63,17 +69,15 @@ void page_list_insert(page_t **pp, int p){
 rule_t *rule_new(int a, int b, rule_t *next){
 	rule_t *p = NULL;
 	if(next != NULL && next->p == b){
-		page_list_insert(&next->prev_l, a);
+		page_list_insert(&next->plist, a);
 		return next;
 	}
 	p = malloc(sizeof(rule_t));
 	if(p == NULL)
 		return p;
 	p->p = b;
-	p->prev_l = NULL;
-	page_list_insert(&p->prev_l, a);
-	p->prev_a = NULL;
-	p->nprev = 0;
+	p->plist = NULL;
+	page_list_insert(&p->plist, a);
 	p->next = next;
 	return p;
 }
@@ -84,11 +88,12 @@ void rule_list_insert(rule_t **pp, int a, int b){
 	*pp = rule_new(a, b, *pp);
 }
 
-void get_rules(FILE *f, rule_t **pp){
+void get_rules(FILE *f, rule_t **pp_prev, rule_t **pp_post){
 	int a;
 	int b;
 	while(2 == fscanf(f, "%d|%d", &a, &b)){
-		rule_list_insert(pp, a, b);
+		rule_list_insert(pp_prev, a, b);
+		rule_list_insert(pp_post, b, a);
 	}
 }
 
@@ -105,7 +110,7 @@ void rule_print(rule_t *p){
 	if(p == NULL)
 		return;
 	printf("r%d:\n", p->p);
-	page_list_print(p->prev_l);
+	page_list_print(p->plist);
 }
 
 void rule_list_print(rule_t *p){
@@ -114,7 +119,15 @@ void rule_list_print(rule_t *p){
 }
 
 void rule_list_free(rule_t *p){
-	if(p != NULL)
+	if(p != NULL){
+		page_list_free(p->plist);
 		rule_list_free(p->next);
+	}
+	free(p);
+}
+
+void page_list_free(page_t *p){
+	if(p != NULL)
+		page_list_free(p->next);
 	free(p);
 }
