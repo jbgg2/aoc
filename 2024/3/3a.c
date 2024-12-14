@@ -34,13 +34,33 @@ int get_number(FILE *f, unsigned int *p){
 			a += c-'0';
 		}else{
 			fseek(f, pos, SEEK_SET);
-			break;
+			goto cleanup;
 		}
 	}
+cleanup:
 	if(ret)
 		*p = a;
-cleanup:
 	return ret;
+}
+
+int get_mul(FILE *f, unsigned int *ap, unsigned int *bp){
+	long pos = 0;
+	unsigned int a;
+	unsigned int b;
+
+	if(ap == NULL || bp == NULL)
+		return 0;
+
+	pos = ftell(f);
+	if(fgetc(f) == 'm' && fgetc(f) == 'u' && fgetc(f) == 'l' && fgetc(f) == '(' &&
+		get_number(f, &a) && fgetc(f) == ',' && 
+		get_number(f, &b) && fgetc(f) == ')'){
+			*ap = a;
+			*bp = b;
+			return 1;
+	}else
+		fseek(f, pos, SEEK_SET);
+	return 0;
 }
 
 void get_input(FILE *f){
@@ -50,16 +70,10 @@ void get_input(FILE *f){
 	long pos = 0;
 	char c;
 	while(!feof(f)){
-		c = fgetc(f);
-		pos = ftell(f);
-		if(c == 'm'){
-			if(fgetc(f) == 'u' && fgetc(f) == 'l' && fgetc(f) == '(' &&
-				get_number(f, &a) && fgetc(f) == ',' && 
-				get_number(f, &b) && fgetc(f) == ')'){
-					s += a*b;
-			}else
-				fseek(f, pos, SEEK_SET);
-		}
+		if(get_mul(f, &a, &b))
+			s += a*b;
+		else
+			fgetc(f);
 	}
 	printf("%u\n", s);
 }
