@@ -70,8 +70,6 @@ unsigned int get_sum(let_t **a, int xmax, int ymax){
 	unsigned int s = 0;
 	for(i=0;i<xmax;i++){
 		for(j=0;j<ymax;j++){
-			if((*a)->n > 0)
-				print_let(*a);
 			s+=(*a)->n;
 			a++;
 		}
@@ -91,7 +89,7 @@ index 1: M
 index 2: A
 index 3: S
 */
-int get_n_r(let_t **a, int xmax, int ymax, let_t *l, int index){
+int get_n_r(let_t **a, int xmax, int ymax, let_t *l, int index, int dx, int dy){
 	int r;
 	int x;
 	int y;
@@ -103,15 +101,17 @@ int get_n_r(let_t **a, int xmax, int ymax, let_t *l, int index){
 	y = l->y;
 
 	r = 0;
-	if((index == 0 && l->c == 'X') || (index == 1 && l->c == 'M') || (index == 2 && l->c == 'A')){
-		r += get_n_r(a, xmax, ymax, get_let(a, xmax, ymax, x-1, y-1), index+1);
-		r += get_n_r(a, xmax, ymax, get_let(a, xmax, ymax, x, y-1), index+1);
-		r += get_n_r(a, xmax, ymax, get_let(a, xmax, ymax, x+1, y-1), index+1);
-		r += get_n_r(a, xmax, ymax, get_let(a, xmax, ymax, x+1, y), index+1);
-		r += get_n_r(a, xmax, ymax, get_let(a, xmax, ymax, x+1, y+1), index+1);
-		r += get_n_r(a, xmax, ymax, get_let(a, xmax, ymax, x, y+1), index+1);
-		r += get_n_r(a, xmax, ymax, get_let(a, xmax, ymax, x-1, y+1), index+1);
-		r += get_n_r(a, xmax, ymax, get_let(a, xmax, ymax, x-1, y), index+1);
+	if(index == 0 && l->c == 'X'){
+		r += get_n_r(a, xmax, ymax, get_let(a, xmax, ymax, x-1, y-1), index+1, -1, -1);
+		r += get_n_r(a, xmax, ymax, get_let(a, xmax, ymax, x, y-1), index+1, 0, -1);
+		r += get_n_r(a, xmax, ymax, get_let(a, xmax, ymax, x+1, y-1), index+1, 1, -1);
+		r += get_n_r(a, xmax, ymax, get_let(a, xmax, ymax, x+1, y), index+1, 1, 0);
+		r += get_n_r(a, xmax, ymax, get_let(a, xmax, ymax, x+1, y+1), index+1, 1, 1);
+		r += get_n_r(a, xmax, ymax, get_let(a, xmax, ymax, x, y+1), index+1, 0, 1);
+		r += get_n_r(a, xmax, ymax, get_let(a, xmax, ymax, x-1, y+1), index+1, -1, 1);
+		r += get_n_r(a, xmax, ymax, get_let(a, xmax, ymax, x-1, y), index+1, -1, 0);
+	}else if((index == 1 && l->c == 'M') || (index == 2 && l->c == 'A')){
+		r += get_n_r(a, xmax, ymax, get_let(a, xmax, ymax, x+dx, y+dy), index+1, dx, dy);
 	}else if(index == 3 && l->c == 'S')
 		return 1;
 	return r;
@@ -124,7 +124,7 @@ void get_n(let_t **a, int xmax, int ymax){
 	pp = a;
 	for(i=0;i<xmax;i++){
 		for(j=0;j<ymax;j++){
-			(*pp)->n = get_n_r(a, xmax, ymax, *pp, 0);
+			(*pp)->n = get_n_r(a, xmax, ymax, *pp, 0, 0, 0);
 			pp++;
 		}
 	}
