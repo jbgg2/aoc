@@ -1,161 +1,138 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <assert.h>
 
-typedef struct pos {
-	unsigned int x;
-	unsigned int y;
-	int astq;
+const char word[] = "XMAS";
+const unsigned int wordlen = 4;
 
-	int touched;
-	int ndetected;
+typedef struct let {
+	char c;
+	int x;
+	int y;
 
-	struct pos *next;
-} pos_t;
+	struct let *next;
+} let_t;
 
-pos_t *get_pos(pos_t **pos, unsigned int xmax, unsigned int ymax, unsigned int x, unsigned int y);
-pos_t **create_pos(pos_t *p, unsigned int xmax, unsigned int ymax);
+void get_input(FILE *f, let_t **list, int *xmax_p, int *ymax_p);
 
-int get_input(FILE *f, pos_t **pp, unsigned int *xmax_p, unsigned int *ymax_p);
-void free_list(pos_t *p);
-int insert_pos(pos_t **pp, unsigned int x, unsigned int y, int astq);
-pos_t *new_pos(unsigned int x, unsigned int y, int astq, pos_t *next);
-void print_pos(const pos_t *p);
-void print_list(const pos_t *p);
+let_t **create_array(let_t *list, int xmax, int ymax);
+void print_array(let_t **a, int xmax, int ymax);
+
+void print_let(let_t *list);
+void print_list(let_t *list);
+void insert_let(let_t **list_p, int x, int y, char c);
+void free_list(let_t *list);
 
 int main(int argc, char *argv[]){
 
 	FILE *f = NULL;
-
-	pos_t *listpos = NULL;
-	pos_t **pos = NULL;
-
-	unsigned int xmax = 0;
-	unsigned int ymax = 0;
-
-	unsigned int i;
-	unsigned int j;
+	let_t *list = NULL;
+	int xmax = 0;
+	int ymax = 0;
+	let_t **a = NULL;
 
 	f = fopen("input", "r");
 	if(f == NULL)
 		goto cleanup;
 
-	if(get_input(f, &listpos, &xmax, &ymax) == 0)
+	get_input(f, &list, &xmax, &ymax);
+	if(list == NULL)
 		goto cleanup;
 
-	printf("xmax: %u; ymax: %u\n", xmax, ymax);
-
-	pos = create_pos(listpos, xmax, ymax);
-
-	/* assert: pos is well defined */
-	for(i=0;i<xmax;i++){
-		for(j=0;j<ymax;j++){
-			pos_t *p;
-			p = get_pos(pos, xmax, ymax, i, j);
-			assert(p != NULL);
-			assert(p->x == i && p->y == j);
-		}
-	}
+	a = create_array(list, xmax, ymax);
+	if(a == NULL)
+		goto cleanup;
 
 cleanup:
-	free(pos);
-	free_list(listpos);
-	if(f != NULL)
+	free(a);
+	free_list(list);
+	if(f)
 		fclose(f);
 	return 0;
 }
 
-pos_t *get_pos(pos_t **pos, unsigned int xmax, unsigned int ymax, unsigned int x, unsigned int y){
-	if(pos == NULL)
-		return NULL;
-	if(x>=xmax || y>=ymax)
-		return NULL;
-	return pos[y*xmax + x];
-}
-
-pos_t **create_pos(pos_t *p, unsigned int xmax, unsigned int ymax){
-	pos_t **r = NULL;
-	pos_t **it = NULL;
-	if(xmax == 0 || ymax == 0)
-		return r;
-
-	r = malloc(xmax*ymax*sizeof(pos_t*));
-	if(r == NULL)
-		return r;
-	for(it = r;p!=NULL;p=p->next,it++){
-		*it = p;
-	}
-	return r;
-}
-
-int get_input(FILE *f, pos_t **pp, unsigned int *xmax_p, unsigned int *ymax_p){
-	unsigned int x = 0;
-	unsigned int y = 0;
+void get_input(FILE *f, let_t **list_p, int *xmax_p, int *ymax_p){
 	char c;
-	unsigned int xmax = 0;
-	unsigned int ymax = 0;
-
-	if(f == NULL || pp == NULL)
-		return 0;
+	int x = 0;
+	int y = 0;
+	int xmax = 0;
+	int ymax = 0;
+	if(f == NULL || list_p == NULL)
+		return;
 	while(!feof(f)){
 		c = fgetc(f);
-		if(c == '.'){
-			insert_pos(pp, x, y, 0);
-			x++;
-		}else if(c == '#'){
-			insert_pos(pp, x, y, 1);
+		if(isalpha(c)){
+			insert_let(list_p, x, y, c);
 			x++;
 		}else if(c == '\n'){
 			if(xmax == 0)
 				xmax = x;
 			else
-				assert(x == xmax);
+				assert(xmax == x);
 			x = 0;
 			y++;
-		}
+		}else
+			assert(1);
 	}
 	ymax = y;
 	if(xmax_p)
 		*xmax_p = xmax;
 	if(ymax_p)
 		*ymax_p = ymax;
-	return 1;
 }
 
-pos_t *new_pos(unsigned int x, unsigned int y, int astq, pos_t *next){
-	pos_t *p;
-	p = malloc(sizeof(pos_t));
+let_t *create_let(int x, int y, char c, let_t *next){
+	let_t *p = NULL;
+	p = malloc(sizeof(let_t));
 	if(p == NULL)
 		return p;
 	p->x = x;
 	p->y = y;
-	p->astq = astq;
-	p->touched = 0;
-	p->ndetected = 0;
+	p->c = c;
 	p->next = next;
 	return p;
 }
 
-int insert_pos(pos_t **pp, unsigned int x, unsigned int y, int astq){
-	if(pp == NULL)
-		return 0;
-	for(;*pp != NULL; pp = &(*pp)->next)
+void insert_let(let_t **list_p, int x, int y, char c){
+	for(;(*list_p)!=NULL;list_p = &(*list_p)->next)
 		;
-	*pp = new_pos(x, y, astq, *pp);
+	*list_p = create_let(x, y, c, *list_p);
 }
 
-void free_list(pos_t *p){
-	if(p != NULL)
-		free_list(p->next);
-	free(p);
+void free_list(let_t *list){
+	if(list != NULL)
+		free_list(list->next);
+	free(list);
 }
 
-void print_pos(const pos_t *p){
-	if(p != NULL)
-		printf("(%u,%u) %d %d\n", p->x, p->y, p->astq, p->touched);
+void print_let(let_t *l){
+	printf("(%d,%d) %c\n", l->x, l->y, l->c);
 }
 
-void print_list(const pos_t *p){
-	for(;p!=NULL;p=p->next)
-		print_pos(p);
+void print_list(let_t *list){
+	for(;list!=NULL;list=list->next)
+		print_let(list);
+}
+
+let_t **create_array(let_t *list, int xmax, int ymax){
+	let_t **a = NULL;
+	let_t **pp = NULL;
+	a = malloc(xmax * ymax * sizeof(let_t*));
+	if(a == NULL)
+		return a;
+	for(pp=a;list!=NULL;list=list->next,pp++)
+		*pp = list;
+	return a;
+}
+
+void print_array(let_t **a, int xmax, int ymax){
+	int i;
+	int j;
+	for(i=0;i<xmax;i++){
+		for(j=0;j<ymax;j++){
+			print_let(*a);
+			a++;
+		}
+	}
 }
