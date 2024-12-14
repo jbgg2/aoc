@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 typedef struct page {
 	int p;
@@ -12,7 +13,12 @@ typedef struct rule {
 	struct rule *next;
 } rule_t;
 
-void get_rules(FILE *f, rule_t **pp_prev, rule_t **pp_post);
+int rules_check(char *rules, int pmax, int a, int b);
+
+void fill_rules(rule_t *prev, rule_t *post, char *rules, int pmax);
+void rules_print(char *rules, int pmax);
+
+void get_rules(FILE *f, rule_t **pp_prev, rule_t **pp_post, int *pmax_p);
 
 void rule_list_print(rule_t *p);
 void rule_list_free(rule_t *p);
@@ -27,11 +33,15 @@ int main(int argc, char *argv[]){
 	rule_t *rule_list_prev = NULL;
 	rule_t *rule_list_post = NULL;
 
+	int pmax = 0;
+
+	char *rules = NULL;
+
 	f = fopen("input", "r");
 	if(f == NULL)
 		goto cleanup;
 
-	get_rules(f, &rule_list_prev, &rule_list_post);
+	get_rules(f, &rule_list_prev, &rule_list_post, &pmax);
 	if(rule_list_prev == NULL || rule_list_post == NULL)
 		goto cleanup;
 
@@ -42,12 +52,47 @@ int main(int argc, char *argv[]){
 	rule_list_print(rule_list_post);
 	*/
 
+	//printf("pmax = %d\n", pmax);
+	rules = calloc((pmax+1)*(pmax+1), sizeof(char));
+	if(rules == NULL)
+		goto cleanup;
+
+	fill_rules(rule_list_prev, rule_list_post, rules, pmax);
+
+	//rules_print(rules, pmax);
+
 cleanup:
+	free(rules);
 	rule_list_free(rule_list_prev);
 	rule_list_free(rule_list_post);
 	if(f != NULL)
 		fclose(f);
 	return 0;
+}
+
+/* return 1 si page a is previous to b */
+int rules_check(char *rules, int pmax, int a, int b){
+	if(a < 0 || a > pmax || b < 0 || b > pmax){
+		return 0;
+	}
+	return rules[b * (pmax+1) + a];
+}
+
+/* page a is previous to b */
+void set_rule(char *rules, int pmax, int a, int b){
+	if(a < 0 || a > pmax || b < 0 || b > pmax){
+		assert(1);
+		return;
+	}
+	rules[b * (pmax+1) + a] = 1;
+}
+
+void fill_rules(rule_t *prev, rule_t *post, char *rules, int pmax){
+	page_t *p = NULL;
+	for(;prev!=NULL;prev=prev->next){
+		for(p=prev->plist;p!=NULL;p=p->next)
+			set_rule(rules, pmax, p->p, prev->p);
+	}
 }
 
 page_t *page_new(int p, page_t *next){
@@ -88,13 +133,20 @@ void rule_list_insert(rule_t **pp, int a, int b){
 	*pp = rule_new(a, b, *pp);
 }
 
-void get_rules(FILE *f, rule_t **pp_prev, rule_t **pp_post){
+void get_rules(FILE *f, rule_t **pp_prev, rule_t **pp_post, int *pmax_p){
 	int a;
 	int b;
+	int pmax = 0;
 	while(2 == fscanf(f, "%d|%d", &a, &b)){
+		if(a>pmax)
+			pmax = a;
+		if(b>pmax)
+			pmax = b;
 		rule_list_insert(pp_prev, a, b);
 		rule_list_insert(pp_post, b, a);
 	}
+	if(pmax_p)
+		*pmax_p = pmax;
 }
 
 void page_print(page_t *p){
@@ -130,4 +182,15 @@ void page_list_free(page_t *p){
 	if(p != NULL)
 		page_list_free(p->next);
 	free(p);
+}
+
+void rules_print(char *rules, int pmax){
+	int i;
+	int j;
+	for(i=0;i<=pmax;i++){
+		for(j=0;j<=pmax;j++){
+			if(rules[j*(pmax+1) + i])
+				printf("%d|%d\n", i, j);
+		}
+	}
 }
