@@ -17,6 +17,7 @@ typedef struct update {
 	page_t *plist;
 	int len;
 	int endq;
+	int *pa;
 	struct update *next;
 } update_t;
 
@@ -25,6 +26,10 @@ void page_list_insert(page_t **pp, int p, int ordq);
 void get_updates(FILE *f, update_t **pp);
 void update_list_print(update_t *p);
 void update_list_free(update_t *p);
+void update_fill_array(update_t *p);
+void update_array_print(update_t *p);
+
+int update_array_check(char *rules, int pmax, int *pa, int len);
 
 int rules_check(char *rules, int pmax, int a, int b);
 
@@ -51,6 +56,11 @@ int main(int argc, char *argv[]){
 
 	update_t *update_list = NULL;
 
+	update_t *update = NULL;
+	int check;
+
+	unsigned int s = 0;
+
 	f = fopen("input", "r");
 	if(f == NULL)
 		goto cleanup;
@@ -65,11 +75,19 @@ int main(int argc, char *argv[]){
 
 	fill_rules(rule_list_prev, rule_list_post, rules, pmax);
 
-	//rules_print(rules, pmax);
-
 	get_updates(f, &update_list);
 
-	//update_list_print(update_list);
+	update_fill_array(update_list);
+
+	for(update=update_list;update!=NULL;update=update->next){
+		check = update_array_check(rules, pmax, update->pa, update->len);
+		if(check){
+			assert(update->len % 2 == 1);
+			s += update->pa[update->len/2];
+		}
+	}
+
+	printf("%u\n", s);
 
 cleanup:
 	update_list_free(update_list);
@@ -81,6 +99,24 @@ cleanup:
 	return 0;
 }
 
+int update_array_check(char *rules, int pmax, int *pa, int len){
+	int i;
+	int j;
+	for(i=0;i<len;i++){
+		for(j=0;j<i;j++){
+			if(rules_check(rules, pmax, pa[i], pa[j])){
+				return 0;
+			}
+		}
+		for(j=i+1;j<len;j++){
+			if(rules_check(rules, pmax, pa[j], pa[i])){
+				return 0;
+			}
+		}
+	}
+	return 1;
+}
+
 update_t *update_new(update_t *next){
 	update_t *p = NULL;
 	p = malloc(sizeof(update_t));
@@ -89,6 +125,7 @@ update_t *update_new(update_t *next){
 	p->plist = NULL;
 	p->endq = 0;
 	p->len = 0;
+	p->pa = NULL;
 	p->next = next;
 	return p;
 }
@@ -259,6 +296,15 @@ void update_list_print(update_t *p){
 		for(page_list=p->plist;page_list!=NULL;page_list=page_list->next){
 			printf("%d,", page_list->p);
 		}
+		printf(" (%d)\n", p->len);
+	}
+}
+
+void update_array_print(update_t *p){
+	int i;
+	for(;p!=NULL;p=p->next){
+		for(i=0;i<p->len;i++)
+			printf("%d,", p->pa[i]);
 		printf("\n");
 	}
 }
@@ -267,6 +313,21 @@ void update_list_free(update_t *p){
 	if(p != NULL){
 		update_list_free(p->next);
 		page_list_free(p->plist);
+		free(p->pa);
 	}
 	free(p);
+}
+
+void update_fill_array(update_t *p){
+	int len;
+	int *pa = NULL;
+	page_t *plist = NULL;
+	for(;p!=NULL;p=p->next){
+		len = p->len;
+		pa = malloc(sizeof(int) * len);
+		assert(pa != NULL);
+		p->pa = pa;
+		for(plist=p->plist;plist!=NULL;plist=plist->next,pa++)
+			*pa = plist->p;
+	}
 }
