@@ -13,6 +13,19 @@ typedef struct rule {
 	struct rule *next;
 } rule_t;
 
+typedef struct update {
+	page_t *plist;
+	int len;
+	int endq;
+	struct update *next;
+} update_t;
+
+void page_list_insert(page_t **pp, int p, int ordq);
+
+void get_updates(FILE *f, update_t **pp);
+void update_list_print(update_t *p);
+void update_list_free(update_t *p);
+
 int rules_check(char *rules, int pmax, int a, int b);
 
 void fill_rules(rule_t *prev, rule_t *post, char *rules, int pmax);
@@ -34,8 +47,9 @@ int main(int argc, char *argv[]){
 	rule_t *rule_list_post = NULL;
 
 	int pmax = 0;
-
 	char *rules = NULL;
+
+	update_t *update_list = NULL;
 
 	f = fopen("input", "r");
 	if(f == NULL)
@@ -45,14 +59,6 @@ int main(int argc, char *argv[]){
 	if(rule_list_prev == NULL || rule_list_post == NULL)
 		goto cleanup;
 
-	/*
-	printf("prev:\n");
-	rule_list_print(rule_list_prev);
-	printf("post:\n");
-	rule_list_print(rule_list_post);
-	*/
-
-	//printf("pmax = %d\n", pmax);
 	rules = calloc((pmax+1)*(pmax+1), sizeof(char));
 	if(rules == NULL)
 		goto cleanup;
@@ -61,13 +67,62 @@ int main(int argc, char *argv[]){
 
 	//rules_print(rules, pmax);
 
+	get_updates(f, &update_list);
+
+	//update_list_print(update_list);
+
 cleanup:
+	update_list_free(update_list);
 	free(rules);
 	rule_list_free(rule_list_prev);
 	rule_list_free(rule_list_post);
 	if(f != NULL)
 		fclose(f);
 	return 0;
+}
+
+update_t *update_new(update_t *next){
+	update_t *p = NULL;
+	p = malloc(sizeof(update_t));
+	if(p == NULL)
+		return p;
+	p->plist = NULL;
+	p->endq = 0;
+	p->len = 0;
+	p->next = next;
+	return p;
+}
+
+void update_list_insert(update_t **pp, int n){
+	for(;*pp!=NULL && (*pp)->endq == 1;pp = &(*pp)->next)
+		;
+	if(*pp == NULL)
+		*pp = update_new(*pp);
+	(*pp)->len++;
+	page_list_insert(&(*pp)->plist, n, 0);
+}
+
+void update_list_set_last_endq(update_t **pp){
+	for(;*pp!=NULL && (*pp)->endq == 1;pp = &(*pp)->next)
+		;
+	assert(*pp != NULL);
+	(*pp)->endq = 1;
+	assert((*pp)->next == NULL);
+}
+
+void get_updates(FILE *f, update_t **pp){
+	int n;
+	char c;
+	while(!feof(f)){
+		c = 0;
+		while(c != '\n' && 1 == fscanf(f, "%d", &n)){
+			update_list_insert(pp, n);
+			c = fgetc(f);
+		}
+		if(c != 0){
+			update_list_set_last_endq(pp);
+		}
+	}
 }
 
 /* return 1 si page a is previous to b */
@@ -81,7 +136,7 @@ int rules_check(char *rules, int pmax, int a, int b){
 /* page a is previous to b */
 void set_rule(char *rules, int pmax, int a, int b){
 	if(a < 0 || a > pmax || b < 0 || b > pmax){
-		assert(1);
+		assert(0);
 		return;
 	}
 	rules[b * (pmax+1) + a] = 1;
@@ -105,8 +160,8 @@ page_t *page_new(int p, page_t *next){
 	return t;
 }
 
-void page_list_insert(page_t **pp, int p){
-	for(;(*pp)!=NULL && (*pp)->p < p; pp = &(*pp)->next)
+void page_list_insert(page_t **pp, int p, int ordq){
+	for(;(*pp)!=NULL && (!ordq || (*pp)->p < p); pp = &(*pp)->next)
 		;
 	*pp = page_new(p, *pp);
 }
@@ -114,7 +169,7 @@ void page_list_insert(page_t **pp, int p){
 rule_t *rule_new(int a, int b, rule_t *next){
 	rule_t *p = NULL;
 	if(next != NULL && next->p == b){
-		page_list_insert(&next->plist, a);
+		page_list_insert(&next->plist, a, 1);
 		return next;
 	}
 	p = malloc(sizeof(rule_t));
@@ -122,7 +177,7 @@ rule_t *rule_new(int a, int b, rule_t *next){
 		return p;
 	p->p = b;
 	p->plist = NULL;
-	page_list_insert(&p->plist, a);
+	page_list_insert(&p->plist, a, 1);
 	p->next = next;
 	return p;
 }
@@ -137,6 +192,7 @@ void get_rules(FILE *f, rule_t **pp_prev, rule_t **pp_post, int *pmax_p){
 	int a;
 	int b;
 	int pmax = 0;
+	long pos = 0;
 	while(2 == fscanf(f, "%d|%d", &a, &b)){
 		if(a>pmax)
 			pmax = a;
@@ -144,7 +200,9 @@ void get_rules(FILE *f, rule_t **pp_prev, rule_t **pp_post, int *pmax_p){
 			pmax = b;
 		rule_list_insert(pp_prev, a, b);
 		rule_list_insert(pp_post, b, a);
+		pos = ftell(f);
 	}
+	fseek(f, pos, SEEK_SET);
 	if(pmax_p)
 		*pmax_p = pmax;
 }
@@ -193,4 +251,22 @@ void rules_print(char *rules, int pmax){
 				printf("%d|%d\n", i, j);
 		}
 	}
+}
+
+void update_list_print(update_t *p){
+	page_t *page_list = NULL;
+	for(;p!=NULL;p=p->next){
+		for(page_list=p->plist;page_list!=NULL;page_list=page_list->next){
+			printf("%d,", page_list->p);
+		}
+		printf("\n");
+	}
+}
+
+void update_list_free(update_t *p){
+	if(p != NULL){
+		update_list_free(p->next);
+		page_list_free(p->plist);
+	}
+	free(p);
 }
